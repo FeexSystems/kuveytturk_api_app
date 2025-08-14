@@ -1,8 +1,6 @@
-# Multi-stage build: build React frontend, then run FastAPI backend
-
-#############
+# ================================
 # Stage 1: Frontend build
-#############
+# ================================
 FROM node:20-alpine AS frontend
 WORKDIR /app
 
@@ -12,27 +10,26 @@ RUN cd frontend \
   && npm ci \
   && npm run build
 
-#############
+# ================================
 # Stage 2: Backend runtime
-#############
+# ================================
 FROM python:3.11-slim
 WORKDIR /app
 
-# System packages (lightweight; cryptography has wheels, so no heavy build deps needed)
+# Upgrade pip
 RUN pip install --upgrade pip
 
-# Copy backend
+# Copy backend code
 COPY backend ./backend
+
 # Copy built frontend into backend/frontend_dist
 COPY --from=frontend /app/frontend/dist ./backend/frontend_dist
 
-# Install Python deps
+# Install Python dependencies
 RUN pip install -r backend/requirements.txt
 
-# Expose port (Render provides PORT env; we read it in app)
+# Expose port (Render will use its own $PORT value)
 ENV PORT=4000
 
-# Start the app
-CMD ["python", "backend/app.py"]
-
-
+# Start FastAPI app with Uvicorn in production mode
+CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "4000", "--workers", "1"]
